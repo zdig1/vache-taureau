@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hors ligne - Vache Taureau</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 40px 20px;
+            background: #ffd700;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .offline-container {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border: 2px solid #000;
+            max-width: 400px;
+        }
+        h2 {
+            color: #000;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        p {
+            color: #333;
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #ffd700;
+            border: 2px solid #000;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background: #ffc400;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="icon">📶</div>
+        <h2>Mode hors ligne</h2>
+        <p>Le réseau n'est pas disponible, mais le jeu reste accessible s'il est déjà en cache.</p>
+        <p><strong>Vache Taureau</strong> fonctionne parfaitement sans connexion une fois installé !</p>
+        <button class="btn" onclick="window.location.reload()">Réessayer</button>
+    </div>
+
+    <script>
+        // Vérification périodique de la connexion
+        setInterval(() => {
+            fetch('/', { method: 'HEAD', cache: 'no-cache' })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch(() => {
+                    // Toujours hors ligne
+                });
+        }, 10000); // Toutes les 10 secondes
+
+        // Vérification au clic n'importe où
+        document.addEventListener('click', () => {
+            fetch('/', { method: 'HEAD', cache: 'no-cache' })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch(() => {
+                    // Toujours hors ligne
+                });
+        });
+    </script>
+</body>
+</html>

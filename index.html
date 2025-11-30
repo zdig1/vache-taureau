@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <title>Vache Taureau</title>
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffd700">
+    <meta name="description" content="Jeu de réflexion - Devinez le nombre secret avec des vaches et taureaux">
+
+    <!-- Pré-chargement des assets critiques -->
+    <link rel="preload" href="icon-192.png" as="image">
+    <link rel="preload" href="style.css" as="style">
+    <link rel="preload" href="game.js" as="script">
+
+    <!-- iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Vache Taureau">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- Windows -->
+    <meta name="msapplication-TileColor" content="#ffd700">
+    <meta name="msapplication-TileImage" content="icon-192.png">
+
+    <!-- SEO -->
+    <meta name="keywords" content="jeu, vache, taureau, mastermind, logique, devinette">
+    <meta name="author" content="zdig1">
+
+    <!-- Open Graph (partage réseaux sociaux) -->
+    <meta property="og:title" content="Vache Taureau - Jeu de logique">
+    <meta property="og:description" content="Devinez le nombre secret ! Un jeu de réflexion addictif">
+    <meta property="og:image" content="icon-512.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vache-taureau-ab1ff2.gitlab.io/">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Vache Taureau">
+    <meta name="twitter:description" content="Jeu de logique - Devinez le nombre secret">
+    <meta name="twitter:image" content="icon-512.png">
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="icon-192.png" type="image/png">
+</head>
+
+<body>
+    <div class="container">
+        <div class="header-buttons">
+            <button class="info-btn" onclick="showRules()" aria-label="Règles du jeu">i</button>
+            <h1>Vache/Taureau</h1>
+            <button class="options-btn" onclick="showOptions()" aria-label="Options du jeu">⚙️</button>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="guessInput" class="guess-input" placeholder="4 chiffres" inputmode="numeric"
+                maxlength="4" pattern="[0-9]*" autocomplete="off">
+            <button class="btn btn-primary" onclick="checkGuess()">Valider</button>
+        </div>
+
+        <div id="messageBox" class="message">Devinez le nombre secret</div>
+
+        <div class="history-container">
+            <div id="historyList" class="history"></div>
+        </div>
+    </div>
+
+    <!-- Modal Règles -->
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Règles du Jeu</h2>
+            <div class="rule-item"><strong>🎯 Objectif</strong> : Devinez le nombre secret</div>
+            <div class="rule-item"><strong>🔢 Règles</strong> : Chiffres uniques, premier chiffre ≠ 0</div>
+            <div class="rule-item"><strong>V (🐄 Vaches)</strong> : Chiffre correct, mais mauvaise position</div>
+            <div class="rule-item"><strong>T (🐂 Taureaux)</strong> : Chiffre correct, en bonne position</div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="hideRules(); confirmReset();">Nouvelle Partie</button>
+                <button class="btn btn-primary" onclick="hideRules()">Fermer</button>
+            </div>
+
+            <p class="signature">by zdig1<br>bit.ly/vache-taureau<br>v 1.2.2</p>
+        </div>
+    </div>
+
+    <!-- Modal Options -->
+    <div id="optionsModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">⚙️ Options</h2>
+
+            <!-- Section Pseudo - Réorganisée -->
+            <div class="pseudo-section" onclick="changePseudo()">
+                <div class="pseudo-display">
+                    <div class="pseudo-info">
+                        <div class="pseudo-label">👤 Pseudo</div>
+                        <div id="currentPseudoDisplay" class="pseudo-value">
+                            <!-- Le pseudo actuel s'affichera ici -->
+                        </div>
+                    </div>
+                    <div class="pseudo-edit">Modifier</div>
+                </div>
+            </div>
+
+            <!-- Section Niveau - Alignée à droite -->
+            <div class="level-section">
+                <div class="level-label">Niveau</div>
+                <select id="gameLevel" class="level-select">
+                    <option value="3">3 chiffres (Facile)</option>
+                    <option value="4" selected>4 chiffres (Classic)</option>
+                    <option value="5">5 chiffres (Difficile)</option>
+                </select>
+            </div>
+
+            <!-- Liens scores et stats -->
+            <div class="stats-link" onclick="hideOptions(); showStats();">
+                <strong>📊 Mes statistiques</strong>
+            </div>
+
+            <div class="scores-link" onclick="hideOptions(); showScores();">
+                <strong>📈 Tous les scores</strong>
+            </div>
+
+            <!-- Dans le modal options -->
+<div class="stats-link" onclick="hideOptions(); clearAllLocalScores();" style="color: #ff4444;">
+    <strong>🗑️ Effacer tous les scores</strong>
+</div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="hideOptions(); confirmReset();">Nouvelle Partie</button>
+                <button class="btn btn-primary" onclick="hideOptions()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Pseudo -->
+    <div id="pseudoModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="pseudoModalTitle">🎮 Choisis ton pseudo</h2>
+
+            <div class="rule-item">
+                <input type="text" id="pseudoInput" class="guess-input" placeholder="Ton pseudo" maxlength="15"
+                    style="width: 100%; text-align: center;">
+                <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                    3-15 caractères, lettres, chiffres, espaces, -, _
+                </div>
+            </div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="savePseudo()">Valider</button>
+                <button class="btn btn-primary" onclick="hidePseudoModal()">Annuler</button>
+            </div>
+
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn" onclick="useAnonymous()"
+                    style="background: transparent; border: 1px solid #ccc; color: #666;">
+                    Utiliser un pseudo aléatoire
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Statistiques -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">📊 Mes Statistiques</h2>
+            <div id="statsContent" class="scores-container"></div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="hideStats(); showScores();"> Voir tous les scores</button>
+                <button class="btn btn-primary" onclick="hideStats()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Scores -->
+    <div id="scoresModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🏆 Tableau des Scores</h2>
+            <div id="highscoresList" class="scores-container"></div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="hideScores(); showStats();">Mes statistiques</button>
+                <button class="btn btn-primary" onclick="hideScores()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Victoire -->
+    <div id="winModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🎉 Félicitations !</h2>
+            <p id="winDetails"></p>
+            <div class="action-group">
+                <button class="btn btn-main" onclick="replayGame()">Rejouer</button>
+                <button class="btn btn-primary" onclick="hideWinModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="score.js"></script>
+
+    <script>
+        // PWA avec gestion d'erreurs
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(registration => {
+                    console.log('✅ PWA enregistrée');
+                })
+                .catch(error => {
+                    console.log('❌ Erreur Service Worker:', error);
+                });
+        }
+        
+        // Correction iOS - Empêcher le zoom sur l'input
+        document.addEventListener('DOMContentLoaded', function() {
+            const guessInput = document.getElementById('guessInput');
+            if (guessInput) {
+                guessInput.addEventListener('focus', function() {
+                    setTimeout(function() {
+                        document.body.style.zoom = "1";
+                    }, 100);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
