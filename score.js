@@ -2,139 +2,143 @@ const SCORE_CONFIG = {
     STORAGE: {
         PENDING: "pendingScores",
         LAST_SYNC: "lastScoreSync", 
-        ONLINE_CACHE: "onlineScoresCache"
+        ONLINE_CACHE: "onlineScoresCache",
+        LOCAL_BACKUP: "localScoresBackup"
     },
-    GITLAB: {
-        REPO_URL: "https://gitlab.com/api/v4/projects/76151178",
-        TOKEN: "glpat-CYgRVOLca0ORevk6zbJJEW86MQp1Oml2eWNyCw.01.121gla7aa",
-        SCORES_FILE: "scores.json",
-        BRANCH: "main"
+    GITHUB: {
+        // URL pour lire les scores depuis GitHub
+        SCORES_URL: "https://zdig1.github.io/vache-taureau/scores.json",
+        RAW_URL: "https://raw.githubusercontent.com/zdig1/vache-taureau/main/scores.json"
     },
-    SYNC_INTERVAL: 60000 // 1 minute
+    SYNC_INTERVAL: 30000, // 30 secondes
+    MAX_PENDING_SCORES: 50
 };
 
-let gitlabAvailable = false;
+let githubAvailable = false;
+let onlineScores = [];
 
-async function checkGitLabConnection() {
+// ==================== CONNEXION GITHUB ====================
+
+async function checkGitHubConnection() {
     try {
-        const response = await fetch(`${SCORE_CONFIG.GITLAB.REPO_URL}`, {
-            headers: {
-                "Private-Token": SCORE_CONFIG.GITLAB.TOKEN
-            },
-            method: "GET"
+        const response = await fetch(SCORE_CONFIG.GITHUB.RAW_URL, {
+            method: 'HEAD',
+            cache: 'no-cache'
         });
-        gitlabAvailable = response.ok;
-        return gitlabAvailable;
+        githubAvailable = response.ok;
+        
+        if (githubAvailable) {
+            console.log('✅ GitHub connecté');
+            setTimeout(() => loadOnlineScores(), 1000);
+        } else {
+            console.log('❌ GitHub non disponible');
+        }
+        
+        return githubAvailable;
     } catch (error) {
-        console.error('❌ Erreur connexion GitLab:', error);
-        gitlabAvailable = false;
+        console.error('❌ Erreur connexion GitHub:', error);
+        githubAvailable = false;
         return false;
     }
 }
 
-async function saveScoreOnline(newScore) {
-    if (!gitlabAvailable) {
-        console.log('📴 GitLab non disponible - score mis en attente');
-        savePendingScore(newScore);
-        return false;
+// ==================== LECTURE DES SCORES (GitHub) ====================
+
+async function loadOnlineScores() {
+    if (!githubAvailable) {
+        console.log('📴 GitHub non disponible - utilisation du cache');
+        return getCachedScores();
     }
 
     try {
-        let existingScores = [];
-        let fileExists = true;
+        console.log('🔄 Chargement des scores depuis GitHub...');
         
-        // Charger les scores existants
-        try {
-            const response = await fetch(
-                `${SCORE_CONFIG.GITLAB.REPO_URL}/repository/files/${encodeURIComponent(SCORE_CONFIG.GITLAB.SCORES_FILE)}/raw?ref=${SCORE_CONFIG.GITLAB.BRANCH}`,
-                {
-                    headers: {"Private-Token": SCORE_CONFIG.GITLAB.TOKEN}
-                }
-            );
+        const response = await fetch(`${SCORE_CONFIG.GITHUB.RAW_URL}?t=${Date.now()}`, {
+            cache: "no-cache",
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            onlineScores = data.scores || [];
             
-            if (response.ok) {
-                const content = await response.text();
-                const data = JSON.parse(content);
-                existingScores = data.scores || [];
-            } else if (response.status === 404) {
-                fileExists = false;
-            } else {
-                throw new Error(`HTTP ${response.status}`);
-            }
-        } catch (error) {
-            fileExists = false;
+            console.log(`✅ ${onlineScores.length} scores chargés depuis GitHub`);
+            
+            updateLocalCache(onlineScores);
+            
+            return onlineScores;
+        } else {
+            throw new Error(`HTTP ${response.status}`);
         }
-
-        // Vérifier les doublons
-        const isDuplicate = existingScores.some(score => 
-            score.playerId === newScore.playerId &&
-            score.attempts === newScore.attempts &&
-            score.level === newScore.level &&
-            Math.abs(new Date(score.timestamp) - new Date(newScore.timestamp)) < 5000
-        );
-        
-        if (isDuplicate) {
-            console.log("🚫 Score en ligne dupliqué ignoré");
-            return true;
-        }
-
-        // Ajouter le nouveau score
-        existingScores.push(newScore);
-        
-        // Limiter à 200 scores maximum
-        if (existingScores.length > 200) {
-            existingScores = existingScores.slice(-200);
-        }
-
-        const scoresData = {
-            scores: existingScores,
-            lastUpdate: new Date().toISOString(),
-            totalGames: existingScores.length,
-            version: "2.1"
-        };
-
-        const method = fileExists ? "PUT" : "POST";
-        const commitMessage = fileExists 
-            ? `Nouveau score: ${newScore.pseudo} - ${newScore.attempts} essais`
-            : "Création fichier scores.json";
-
-        const response = await fetch(
-            `${SCORE_CONFIG.GITLAB.REPO_URL}/repository/files/${encodeURIComponent(SCORE_CONFIG.GITLAB.SCORES_FILE)}`,
-            {
-                method: method,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Private-Token": SCORE_CONFIG.GITLAB.TOKEN
-                },
-                body: JSON.stringify({
-                    branch: SCORE_CONFIG.GITLAB.BRANCH,
-                    content: btoa(unescape(encodeURIComponent(JSON.stringify(scoresData, null, 2)))),
-                    commit_message: commitMessage,
-                    encoding: "base64"
-                })
-            }
-        );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`GitLab Error ${response.status}: ${JSON.stringify(errorData)}`);
-        }
-
-        console.log("✅ Score sauvegardé en ligne avec succès");
-        return true;
-
     } catch (error) {
-        console.error('❌ Erreur sauvegarde en ligne:', error);
-        savePendingScore(newScore);
-        return false;
+        console.error('❌ Erreur chargement scores GitHub:', error);
+        githubAvailable = false;
+        return getCachedScores();
     }
+}
+
+function getCachedScores() {
+    const cached = localStorage.getItem(SCORE_CONFIG.STORAGE.ONLINE_CACHE);
+    if (cached) {
+        console.log('📱 Utilisation du cache local');
+        return JSON.parse(cached);
+    }
+    return [];
+}
+
+function updateLocalCache(scores) {
+    localStorage.setItem(SCORE_CONFIG.STORAGE.ONLINE_CACHE, JSON.stringify(scores));
+    localStorage.setItem(SCORE_CONFIG.STORAGE.LAST_SYNC, Date.now().toString());
+}
+
+// ==================== ÉCRITURE HYBRIDE ====================
+
+async function saveScoreOnline(newScore) {
+    console.log('💾 Sauvegarde hybride du score:', newScore);
+    
+    // 1. Sauvegarde locale immédiate
+    savePendingScore(newScore);
+    
+    // 2. Mise à jour de l'affichage local
+    updateLocalDisplayWithNewScore(newScore);
+    
+    // 3. Tentative d'envoi vers le système de backup
+    if (githubAvailable) {
+        try {
+            await backupScoreToLocalStorage(newScore);
+        } catch (error) {
+            console.log('⚠️ Backup échoué, score conservé localement');
+        }
+    }
+    
+    return false; // Toujours false car pas d'écriture directe sur GitHub
 }
 
 function savePendingScore(score) {
-    const pending = JSON.parse(localStorage.getItem(SCORE_CONFIG.STORAGE.PENDING) || "[]");
-    pending.push(score);
-    localStorage.setItem(SCORE_CONFIG.STORAGE.PENDING, JSON.stringify(pending));
-    console.log("📥 Score mis en attente:", score);
+    const pending = getPendingScores();
+    
+    const isDuplicate = pending.some(pendingScore => 
+        pendingScore.playerId === score.playerId &&
+        pendingScore.attempts === score.attempts &&
+        pendingScore.level === score.level &&
+        Math.abs(new Date(pendingScore.timestamp) - new Date(score.timestamp)) < 5000
+    );
+    
+    if (!isDuplicate) {
+        pending.push(score);
+        
+        if (pending.length > SCORE_CONFIG.MAX_PENDING_SCORES) {
+            pending.shift();
+        }
+        
+        localStorage.setItem(SCORE_CONFIG.STORAGE.PENDING, JSON.stringify(pending));
+        console.log("📥 Score mis en attente:", score);
+    } else {
+        console.log("🚫 Score dupliqué ignoré");
+    }
 }
 
 function getPendingScores() {
@@ -145,76 +149,40 @@ function clearPendingScores() {
     localStorage.removeItem(SCORE_CONFIG.STORAGE.PENDING);
 }
 
-async function syncPendingScores() {
-    const pending = getPendingScores();
-    if (pending.length === 0) return;
+// ==================== BACKUP LOCAL ====================
 
-    console.log(`🔄 Synchronisation de ${pending.length} scores en attente...`);
-    
-    let successCount = 0;
-    for (const score of pending) {
-        try {
-            const success = await saveScoreOnline(score);
-            if (success) successCount++;
-        } catch (error) {
-            console.error('❌ Erreur sync score:', error);
-            break;
-        }
-    }
-    
-    if (successCount === pending.length) {
-        clearPendingScores();
-        console.log('✅ Tous les scores synchronisés');
-    }
-}
-
-async function loadOnlineScores() {
+async function backupScoreToLocalStorage(score) {
     try {
-        console.log('🔄 Chargement des scores en ligne...');
+        const backup = JSON.parse(localStorage.getItem(SCORE_CONFIG.STORAGE.LOCAL_BACKUP) || "{}");
+        const today = new Date().toISOString().split('T')[0];
         
-        const response = await fetch(
-            `${SCORE_CONFIG.GITLAB.REPO_URL}/repository/files/${encodeURIComponent(SCORE_CONFIG.GITLAB.SCORES_FILE)}/raw?ref=${SCORE_CONFIG.GITLAB.BRANCH}`,
-            {
-                headers: {
-                    "Private-Token": SCORE_CONFIG.GITLAB.TOKEN,
-                    "Cache-Control": "no-cache"
-                },
-                cache: "no-cache"
+        if (!backup[today]) {
+            backup[today] = [];
+        }
+        
+        backup[today].push({
+            ...score,
+            backedUpAt: new Date().toISOString()
+        });
+        
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        
+        Object.keys(backup).forEach(date => {
+            if (new Date(date) < oneWeekAgo) {
+                delete backup[date];
             }
-        );
+        });
         
-        console.log('📡 Status réponse:', response.status);
+        localStorage.setItem(SCORE_CONFIG.STORAGE.LOCAL_BACKUP, JSON.stringify(backup));
+        console.log('📦 Score sauvegardé en backup local');
         
-        if (response.ok) {
-            const content = await response.text();
-            console.log('📄 Contenu brut:', content.substring(0, 200) + '...');
-            
-            const data = JSON.parse(content);
-            const scores = data.scores || [];
-            
-            console.log(`✅ ${scores.length} scores chargés`);
-            
-            // Mettre à jour le cache
-            localStorage.setItem(SCORE_CONFIG.STORAGE.ONLINE_CACHE, JSON.stringify(scores));
-            localStorage.setItem(SCORE_CONFIG.STORAGE.LAST_SYNC, Date.now().toString());
-            
-            return scores;
-        } else {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-        }
     } catch (error) {
-        console.error('❌ Erreur chargement scores:', error);
-        
-        // Fallback au cache
-        const cached = localStorage.getItem(SCORE_CONFIG.STORAGE.ONLINE_CACHE);
-        if (cached) {
-            console.log('📱 Utilisation du cache local');
-            return JSON.parse(cached);
-        }
-        
-        return [];
+        console.error('❌ Erreur backup local:', error);
     }
 }
+
+// ==================== AFFICHAGE DES SCORES ====================
 
 async function displayOnlineScores() {
     const container = document.getElementById("highscoresList");
@@ -223,60 +191,139 @@ async function displayOnlineScores() {
         return;
     }
 
-    console.log('🔄 Chargement des scores en ligne...');
-    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">🌐 Chargement des scores en ligne...</div>';
+    console.log('🔄 Affichage des scores en ligne...');
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">🌐 Chargement des scores...</div>';
 
     try {
         const scores = await loadOnlineScores();
-        console.log(`📊 ${scores.length} scores chargés en ligne`);
+        const pendingScores = getPendingScores();
         
-        if (scores.length > 0) {
-            // Utilise la fonction de game.js pour afficher
-            if (typeof displayScoresInContainer === 'function') {
-                displayScoresInContainer(scores, container);
-            } else {
-                // Fallback simple
-                container.innerHTML = `<div>${scores.length} scores en ligne chargés</div>`;
+        console.log(`📊 ${scores.length} scores en ligne + ${pendingScores.length} en attente`);
+        
+        if (scores.length === 0 && pendingScores.length === 0) {
+            showNoScoresMessage(container);
+            return;
+        }
+
+        const allScores = [...scores, ...pendingScores];
+        
+        if (typeof displayScoresInContainer === 'function') {
+            displayScoresInContainer(allScores, container);
+            
+            if (pendingScores.length > 0) {
+                const indicator = document.createElement('div');
+                indicator.innerHTML = `
+                    <div style="text-align: center; margin-top: 15px; padding: 10px; background: #fff9c4; border-radius: 8px; border: 2px solid #ffd700;">
+                        <span style="color: #ff9800;">⏳</span> 
+                        ${pendingScores.length} score(s) en attente de synchronisation
+                    </div>
+                `;
+                container.appendChild(indicator);
             }
         } else {
-            container.innerHTML = `
-                <div style="text-align: center; color: #666; padding: 20px;">
-                    <div style="font-size: 48px; margin-bottom: 10px;">🌐</div>
-                    <div>Aucun score en ligne</div>
-                    <div style="font-size: 12px; margin-top: 8px;">Soyez le premier à jouer !</div>
-                </div>
-            `;
+            container.innerHTML = `<div>${allScores.length} scores disponibles (${pendingScores.length} en attente)</div>`;
         }
+        
     } catch (error) {
-        console.error('❌ Erreur chargement scores en ligne:', error);
-        container.innerHTML = `
-            <div style="text-align: center; color: #666; padding: 20px;">
-                <div style="font-size: 48px; margin-bottom: 10px;">📱</div>
-                <div>Mode hors ligne</div>
-                <div style="font-size: 12px; margin-top: 8px;">Affichage des scores locaux</div>
-            </div>
-        `;
-        // Fallback aux scores locaux
-        setTimeout(() => {
-            if (typeof displayLocalScores === 'function') {
-                displayLocalScores();
-            }
-        }, 1000);
+        console.error('❌ Erreur affichage scores:', error);
+        showOfflineMessage(container);
     }
 }
 
-// Initialisation
-window.addEventListener("load", (async function () {
-    if (await checkGitLabConnection()) {
-        console.log('✅ GitLab connecté');
-        getPendingScores().length > 0 && setTimeout(() => syncPendingScores(), 2000);
-    } else {
-        console.log('❌ GitLab non disponible');
+function updateLocalDisplayWithNewScore(newScore) {
+    const container = document.getElementById("highscoresList");
+    if (container && container.innerHTML.includes('scores disponibles')) {
+        const pending = getPendingScores();
+        if (typeof displayScoresInContainer === 'function') {
+            displayScoresInContainer(pending, container);
+        }
+    }
+}
+
+function showNoScoresMessage(container) {
+    container.innerHTML = `
+        <div style="text-align: center; color: #666; padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 10px;">🌐</div>
+            <div>Aucun score en ligne</div>
+            <div style="font-size: 12px; margin-top: 8px;">Soyez le premier à jouer !</div>
+            <button onclick="showLocalScoresOnly()" class="btn btn-primary" style="margin-top: 15px;">
+                📱 Voir mes scores locaux
+            </button>
+        </div>
+    `;
+}
+
+function showOfflineMessage(container) {
+    container.innerHTML = `
+        <div style="text-align: center; color: #666; padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 10px;">📱</div>
+            <div>Mode hors ligne</div>
+            <div style="font-size: 12px; margin-top: 8px;">Connexion GitHub indisponible</div>
+            <button onclick="showLocalScoresOnly()" class="btn btn-primary" style="margin-top: 15px;">
+                📱 Voir mes scores locaux
+            </button>
+        </div>
+    `;
+}
+
+// ==================== SYNCHRONISATION ====================
+
+async function manualSync() {
+    if (!githubAvailable) {
+        showMessage("❌ GitHub non disponible", "message-error");
+        return;
     }
     
+    showMessage("🔄 Synchronisation...");
+    
+    try {
+        await loadOnlineScores();
+        const pending = getPendingScores();
+        
+        if (pending.length > 0) {
+            showMessage(`⏳ ${pending.length} scores en attente (écriture manuelle nécessaire)`);
+        } else {
+            showMessage("✅ Scores à jour");
+        }
+        
+    } catch (error) {
+        showMessage("❌ Erreur synchronisation", "message-error");
+    }
+}
+
+// ==================== INITIALISATION ====================
+
+window.addEventListener("load", async function () {
+    await checkGitHubConnection();
+    
     setInterval(async () => {
-        if (gitlabAvailable && getPendingScores().length > 0) {
-            await syncPendingScores();
+        if (githubAvailable) {
+            await loadOnlineScores();
         }
     }, SCORE_CONFIG.SYNC_INTERVAL);
-}));
+    
+    cleanupOldBackups();
+});
+
+function cleanupOldBackups() {
+    try {
+        const backup = JSON.parse(localStorage.getItem(SCORE_CONFIG.STORAGE.LOCAL_BACKUP) || "{}");
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        
+        let cleanedCount = 0;
+        Object.keys(backup).forEach(date => {
+            if (new Date(date) < oneWeekAgo) {
+                delete backup[date];
+                cleanedCount++;
+            }
+        });
+        
+        if (cleanedCount > 0) {
+            localStorage.setItem(SCORE_CONFIG.STORAGE.LOCAL_BACKUP, JSON.stringify(backup));
+            console.log(`🧹 ${cleanedCount} vieux backups nettoyés`);
+        }
+    } catch (error) {
+        console.error('❌ Erreur nettoyage backups:', error);
+    }
+}
