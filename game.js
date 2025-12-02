@@ -315,8 +315,9 @@ function saveGameScore(level, attempts, time, date = null) {
         date: date || new Date().toLocaleDateString("fr-FR"),
         timestamp: Date.now(),
         pseudo: player.pseudo,
+        playerName: player.pseudo, // Ajouter ce champ pour GitHub
         playerId: player.playerId,
-        gameId: currentGameId // Ajouter l'identifiant de partie
+        gameId: currentGameId
     };
 
     console.log("💾 Sauvegarde du score:", newScore);
@@ -324,26 +325,31 @@ function saveGameScore(level, attempts, time, date = null) {
     // 1. Sauvegarde locale
     saveScoreLocal(newScore);
     
-    // 2. Synchronisation GitLab
+    // 2. Synchronisation GitHub
     if (typeof saveScoreOnline === 'function') {
-        console.log("🔄 Tentative d'envoi vers GitLab...");
+        console.log("🚀 Tentative d'envoi vers GitHub...");
         saveScoreOnline(newScore)
             .then(success => {
                 if (success) {
-                    console.log("✅ Score envoyé à GitLab !");
+                    console.log("✅ Score envoyé à GitHub !");
                     showMessage("Score synchronisé en ligne ! 🌐");
+                    
+                    // Recharger l'affichage des scores
+                    if (typeof displayOnlineScores === 'function') {
+                        setTimeout(() => displayOnlineScores(), 1000);
+                    }
+                } else {
+                    console.log("📱 Score sauvegardé localement, en attente de sync");
+                    showMessage("Score sauvegardé localement 📱");
                 }
             })
             .catch(error => {
-                console.log('❌ Erreur GitLab:', error.message);
-                // Mettre en attente pour resync plus tard
-                if (typeof savePendingScore === 'function') {
-                    savePendingScore(newScore);
-                    console.log("💾 Score mis en attente");
-                }
+                console.log('❌ Erreur GitHub:', error.message);
+                showMessage("Score sauvegardé localement 📱");
             });
     } else {
         console.log("❌ Fonction saveScoreOnline non disponible");
+        showMessage("Score sauvegardé localement 📱");
     }
 
     return true;
@@ -517,31 +523,29 @@ function displayScoresInContainer(scores, container) {
                     ${isCurrentPlayer ? 'background: #fff176; border-width: 3px;' : ''}
                 `;
 
-                html += `
-                    <div style="${boxStyle}">
-                        
-                        <!-- Colonne GAUCHE : Position + Pseudo + Date -->
-                        <div style="flex: 1; display: flex; align-items: start;">
-                            <div style="font-weight: bold; margin-right: 8px; min-width: 30px; text-align: center;">${positionDisplay}</div>
-                            <div>
-                                <div style="font-weight: ${isCurrentPlayer ? 'bold' : 'normal'}; color: ${isCurrentPlayer ? levelColor : '#000'}; margin-bottom: 4px;">
-                                    ${score.pseudo || 'Anonyme'}
-                                    ${isCurrentPlayer ? '<span style="font-size: 10px; color: ' + levelColor + ';"> (Vous)</span>' : ''}
-                                </div>
-                                <div style="font-size: 11px; color: #666;">${score.date}</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Colonne DROITE : Tentatives + Temps -->
-                        <div style="text-align: right; min-width: 80px;">
-                            <div style="font-weight: bold; margin-bottom: 2px; color: #d32f2f;">
-                                ${score.attempts} essai${score.attempts > 1 ? 's' : ''}
-                            </div>
-                            <div style="font-size: 11px; color: #666;">${score.time}</div>
-                        </div>
-                        
-                    </div>
-                `;
+              html += `
+    <div style="padding: 12px; background: #fff9c4; margin: 8px 0; border-radius: 10px; border: 2px solid ${levelColor}; ${isCurrentPlayer ? 'background: #fff176; border-width: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}">
+        <!-- Ligne 1 -->
+        <div style="margin-bottom: 5px;">
+            <span style="font-weight: bold; font-size: 16px; color: ${levelColor}; margin-right: 8px;">${positionDisplay}</span>
+            <span style="font-size: 15px; font-weight: ${isCurrentPlayer ? 'bold' : 'normal'}; color: #000;">
+                ${score.pseudo || 'Anonyme'}
+                ${isCurrentPlayer ? '<span style="font-size: 11px; color: ' + levelColor + '; margin-left: 5px;">(vous)</span>' : ''}
+            </span>
+        </div>
+        
+        <!-- Ligne 2 -->
+        <div style="margin-bottom: 3px; font-size: 14px;">
+            <span style="font-weight: bold; color: #d32f2f;">${score.attempts} essai${score.attempts > 1 ? 's' : ''}</span>
+            <span style="color: #666; margin-left: 8px;">en ${score.time}</span>
+        </div>
+        
+        <!-- Ligne 3 -->
+        <div style="font-size: 12px; color: #888; text-align: right;">
+            ${score.date}
+        </div>
+    </div>
+`;
             });
             
             html += "</div>";

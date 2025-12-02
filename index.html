@@ -35,7 +35,7 @@
     <meta property="og:description" content="Devinez le nombre secret ! Un jeu de réflexion addictif">
     <meta property="og:image" content="icon-512.png">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://vache-taureau-ab1ff2.gitlab.io/">
+    <meta property="og:url" content="https://zdig1.github.io/vache-taureau/">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
@@ -82,7 +82,7 @@
                 <button class="btn btn-primary" onclick="hideRules()">Fermer</button>
             </div>
 
-            <p class="signature">by zdig1<br>bit.ly/vache-taureau<br>v 1.2.1</p>
+            <p class="signature">by zdig1<br>bit.ly/vache-taureau<br>v 3.0.0</p>
         </div>
     </div>
 
@@ -123,10 +123,20 @@
                 <strong>📈 Tous les scores</strong>
             </div>
 
-            <!-- Dans le modal options -->
-<div class="stats-link" onclick="hideOptions(); clearAllLocalScores();" style="color: #ff4444;">
-    <strong>🗑️ Effacer tous les scores</strong>
-</div>
+            <!-- Bouton État GitHub -->
+            <div class="stats-link" onclick="hideOptions(); showGitHubStatus();" style="background: #333; color: white;">
+                <strong>🔧 État GitHub</strong>
+            </div>
+
+            <!-- Synchronisation manuelle -->
+            <div class="stats-link" onclick="hideOptions(); manualSync();" style="background: #4CAF50; color: white;">
+                <strong>🔄 Sync maintenant</strong>
+            </div>
+
+            <!-- Effacer scores locaux -->
+            <div class="stats-link" onclick="hideOptions(); clearAllLocalScores();" style="background: #ff4444; color: white;">
+                <strong>🗑️ Effacer scores locaux</strong>
+            </div>
 
             <div class="action-group">
                 <button class="btn btn-main" onclick="hideOptions(); confirmReset();">Nouvelle Partie</button>
@@ -169,7 +179,7 @@
             <div id="statsContent" class="scores-container"></div>
 
             <div class="action-group">
-                <button class="btn btn-main" onclick="hideStats(); showScores();"> Voir tous les scores</button>
+                <button class="btn btn-main" onclick="hideStats(); showScores();">Voir tous les scores</button>
                 <button class="btn btn-primary" onclick="hideStats()">Fermer</button>
             </div>
         </div>
@@ -180,6 +190,21 @@
         <div class="modal-content">
             <h2 class="modal-title">🏆 Tableau des Scores</h2>
             <div id="highscoresList" class="scores-container"></div>
+
+            <!-- Options d'affichage -->
+            <div style="display: flex; gap: 10px; justify-content: center; margin: 15px 0;">
+                <button onclick="showLocalScoresOnly()" class="btn" style="background: #FF9800; color: white;">
+                    📱 Scores locaux
+                </button>
+                <button onclick="showOnlineScores()" class="btn" style="background: #2196F3; color: white;">
+                    🌐 Scores GitHub
+                </button>
+            </div>
+
+            <!-- Bouton synchronisation -->
+            <div class="stats-link" onclick="manualSync()" style="background: #4CAF50; color: white; margin: 10px 0;">
+                <strong>🔄 Synchroniser avec GitHub</strong>
+            </div>
 
             <div class="action-group">
                 <button class="btn btn-main" onclick="hideScores(); showStats();">Mes statistiques</button>
@@ -196,6 +221,21 @@
             <div class="action-group">
                 <button class="btn btn-main" onclick="replayGame()">Rejouer</button>
                 <button class="btn btn-primary" onclick="hideWinModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal État GitHub -->
+    <div id="githubStatusModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🔧 État GitHub</h2>
+            <div id="githubStatusContent" class="scores-container">
+                Chargement des informations GitHub...
+            </div>
+
+            <div class="action-group">
+                <button class="btn btn-main" onclick="manualSync()">🔄 Synchroniser maintenant</button>
+                <button class="btn btn-primary" onclick="hideGitHubStatus()">Fermer</button>
             </div>
         </div>
     </div>
@@ -225,6 +265,74 @@
                     }, 100);
                 });
             }
+        });
+
+        // Fonctions pour les nouveaux modals
+        function showGitHubStatus() {
+            const modal = document.getElementById("githubStatusModal");
+            const content = document.getElementById("githubStatusContent");
+            
+            // Récupérer l'état actuel
+            const pending = window.getPendingScores ? window.getPendingScores() : [];
+            const cached = window.getCachedScores ? window.getCachedScores() : [];
+            
+            let statusHTML = `
+                <div style="padding: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <div><strong>Connexion GitHub:</strong> ${window.githubAvailable ? '✅ Connecté' : '❌ Hors ligne'}</div>
+                        <div><strong>Scores en cache:</strong> ${cached.length}</div>
+                        <div><strong>Scores en attente:</strong> ${pending.length}</div>
+                        <div><strong>Dernière synchro:</strong> ${new Date().toLocaleTimeString()}</div>
+                    </div>
+            `;
+            
+            if (pending.length > 0) {
+                statusHTML += `
+                    <div style="background: #fff9c4; padding: 10px; border-radius: 8px; margin-top: 10px;">
+                        <strong>Scores en attente de synchronisation:</strong>
+                        ${pending.map((score, index) => `
+                            <div style="margin-top: 5px; padding: 5px; background: white; border-radius: 5px;">
+                                ${index + 1}. ${score.playerName || 'Anonyme'} - ${score.attempts} coups (Niv. ${score.level})
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            statusHTML += `</div>`;
+            content.innerHTML = statusHTML;
+            modal.style.display = "block";
+        }
+
+        function hideGitHubStatus() {
+            document.getElementById("githubStatusModal").style.display = "none";
+        }
+
+        // Gestion des clics en dehors des modals
+        window.addEventListener('click', function(event) {
+            const modals = ['rulesModal', 'optionsModal', 'pseudoModal', 'statsModal', 'scoresModal', 'winModal', 'githubStatusModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal && event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        // Initialisation au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎮 Vache Taureau - Version 3.0.0 (GitHub R/W)');
+            
+            // Vérifier la connexion GitHub
+            setTimeout(() => {
+                if (window.checkGitHubConnection) {
+                    window.checkGitHubConnection().then(connected => {
+                        if (connected) {
+                            console.log('✅ Système GitHub prêt');
+                        }
+                    });
+                }
+            }, 2000);
         });
     </script>
 </body>
