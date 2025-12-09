@@ -7,7 +7,10 @@ const CONFIG = {
         LEVEL: 'gameLevel',
         RULES_SEEN: 'hasSeenRules',
         SCORES: 'vacheTaureauLocalScores',
-        CURRENT_GAME_ID: 'currentGameId' // Nouveau : identifiant de partie
+        CURRENT_GAME_ID: 'currentGameId',
+        SECRET: 'currentSecret',
+        ATTEMPTS: 'currentAttempts',
+        START_TIME: 'gameStartTime'
     }
 };
 
@@ -16,7 +19,7 @@ let secret = '';
 let attempts = 0;
 let startTime = Date.now();
 let errorTimeout = null;
-let currentGameId = null; // Identifiant unique de la partie en cours
+let currentGameId = null;
 
 // Éléments DOM
 let guessInput, messageBox, historyList, gameLevelSelect;
@@ -157,6 +160,10 @@ function checkGuess() {
 
     // Calcul vaches/taureaux
     attempts++;
+    
+    // Sauvegarder le nouveau nombre d'essais
+    localStorage.setItem(CONFIG.STORAGE.ATTEMPTS, attempts.toString());
+    
     let vaches = 0, taureaux = 0;
     for (let i = 0; i < guess.length; i++) {
         if (secret.includes(guess[i])) {
@@ -174,7 +181,7 @@ function checkGuess() {
     historyList.prepend(historyItem);
     localStorage.setItem(CONFIG.STORAGE.HISTORY, historyList.innerHTML);
 
-    // VICTOURE - UNIQUEMENT sauvegarder si c'est une nouvelle victoire
+    // VICTOIRE
     if (taureaux === level) {
         const timeSec = Math.floor((Date.now() - startTime) / 1000);
         const minutes = Math.floor(timeSec / 60);
@@ -194,15 +201,22 @@ function checkGuess() {
     guessInput.focus();
 }
 
-// Nouvelle fonction : Vérifier si la partie actuelle a déjà été sauvegardée
 function isGameAlreadySaved() {
     const savedGameId = localStorage.getItem(CONFIG.STORAGE.CURRENT_GAME_ID);
     return savedGameId === currentGameId;
 }
 
-// Nouvelle fonction : Marquer la partie comme sauvegardée
 function markGameAsSaved() {
     localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
+}
+
+function clearGameState() {
+    // À utiliser quand une partie est terminée ou réinitialisée
+    localStorage.removeItem(CONFIG.STORAGE.SECRET);
+    localStorage.removeItem(CONFIG.STORAGE.ATTEMPTS);
+    localStorage.removeItem(CONFIG.STORAGE.START_TIME);
+    localStorage.removeItem(CONFIG.STORAGE.HISTORY);
+    // Ne pas supprimer CURRENT_GAME_ID pour éviter les resauvegardes
 }
 
 function showMessage(text, type = "") {
@@ -251,14 +265,23 @@ function resetGame() {
     // Générer un nouvel identifiant de partie
     currentGameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Nettoyer l'état précédent
+    clearGameState();
+    
+    // Générer un NOUVEAU secret
     secret = generateSecret();
     attempts = 0;
     startTime = Date.now();
     guessInput.value = "";
     historyList.innerHTML = "";
     showMessage("Devinez le nombre secret");
-    localStorage.removeItem(CONFIG.STORAGE.HISTORY);
-    // NE PAS supprimer CURRENT_GAME_ID pour éviter les resauvegardes
+    
+    // Sauvegarder le NOUVEL état
+    localStorage.setItem(CONFIG.STORAGE.SECRET, secret);
+    localStorage.setItem(CONFIG.STORAGE.ATTEMPTS, attempts.toString());
+    localStorage.setItem(CONFIG.STORAGE.START_TIME, startTime.toString());
+    localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
+    
     hideWinModal();
     guessInput.focus();
 }
@@ -287,6 +310,9 @@ function applyLevelChange(level) {
     // Générer un nouvel identifiant de partie
     currentGameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Nettoyer l'état précédent
+    clearGameState();
+    
     guessInput.maxLength = level;
     guessInput.placeholder = `${level} chiffres`;
     secret = generateSecret();
@@ -295,7 +321,14 @@ function applyLevelChange(level) {
     guessInput.value = "";
     historyList.innerHTML = "";
     showMessage("Devinez le nombre secret");
-    localStorage.removeItem(CONFIG.STORAGE.HISTORY);
+    
+    // Sauvegarder tout le nouvel état
+    localStorage.setItem(CONFIG.STORAGE.SECRET, secret);
+    localStorage.setItem(CONFIG.STORAGE.ATTEMPTS, attempts.toString());
+    localStorage.setItem(CONFIG.STORAGE.START_TIME, startTime.toString());
+    localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
+    localStorage.setItem(CONFIG.STORAGE.LEVEL, level.toString());
+    
     updateDifficultyIndicator();
 }
 
@@ -315,7 +348,7 @@ function saveGameScore(level, attempts, time, date = null) {
         date: date || new Date().toLocaleDateString("fr-FR"),
         timestamp: Date.now(),
         pseudo: player.pseudo,
-        playerName: player.pseudo, // Ajouter ce champ pour GitHub
+        playerName: player.pseudo,
         playerId: player.playerId,
         gameId: currentGameId
     };
@@ -325,7 +358,10 @@ function saveGameScore(level, attempts, time, date = null) {
     // 1. Sauvegarde locale
     saveScoreLocal(newScore);
     
-    // 2. Synchronisation GitHub
+    // 2. NETTOYER l'état du jeu (puisque la partie est terminée)
+    clearGameState();
+    
+    // 3. Synchronisation GitHub
     if (typeof saveScoreOnline === 'function') {
         console.log("🚀 Tentative d'envoi vers GitHub...");
         saveScoreOnline(newScore)
@@ -510,20 +546,7 @@ function displayScoresInContainer(scores, container) {
                 else if (position === 3) positionDisplay = "🥉";
                 else positionDisplay = `${position}.`;
 
-                // Style UNIFORME pour toutes les boîtes
-                const boxStyle = `
-                    display: flex; 
-                    justify-content: space-between; 
-                    align-items: start; 
-                    padding: 10px 12px; 
-                    background: #fff9c4; 
-                    margin: 6px 0; 
-                    border-radius: 8px; 
-                    border: 2px solid ${levelColor};
-                    ${isCurrentPlayer ? 'background: #fff176; border-width: 3px;' : ''}
-                `;
-
-              html += `
+                html += `
     <div style="padding: 12px; background: #fff9c4; margin: 8px 0; border-radius: 10px; border: 2px solid ${levelColor}; ${isCurrentPlayer ? 'background: #fff176; border-width: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}">
         <!-- Ligne 1 -->
         <div style="margin-bottom: 5px;">
@@ -553,6 +576,32 @@ function displayScoresInContainer(scores, container) {
     
     container.innerHTML = html;
 }
+
+
+
+
+
+
+// Ajoutez cette fonction après les autres fonctions de score
+function updateLocalDisplayWithNewScore(score) {
+    // Cette fonction est appelée par score.js pour mettre à jour l'affichage
+    console.log('📊 Mise à jour affichage avec nouveau score:', score);
+    
+    // Si le modal des scores est ouvert, recharger l'affichage
+    const scoresModal = document.getElementById("scoresModal");
+    if (scoresModal && scoresModal.style.display === "block") {
+        const currentView = localStorage.getItem('currentScoresView') || 'local';
+        if (currentView === 'local') {
+            displayLocalScores();
+        } else if (currentView === 'online') {
+            if (typeof displayOnlineScores === 'function') {
+                displayOnlineScores();
+            }
+        }
+    }
+}
+
+
 
 // ==================== INTERFACE ====================
 
@@ -690,12 +739,43 @@ window.addEventListener("load", () => {
     historyList = document.getElementById("historyList");
     gameLevelSelect = document.getElementById("gameLevel");
 
-    // Générer un identifiant de partie au chargement
-    currentGameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Restaurer état
+    // RESTAURER l'état précédent ou créer une nouvelle partie
+    const savedSecret = localStorage.getItem(CONFIG.STORAGE.SECRET);
+    const savedAttempts = localStorage.getItem(CONFIG.STORAGE.ATTEMPTS);
+    const savedStartTime = localStorage.getItem(CONFIG.STORAGE.START_TIME);
+    const savedGameId = localStorage.getItem(CONFIG.STORAGE.CURRENT_GAME_ID);
     const savedHistory = localStorage.getItem(CONFIG.STORAGE.HISTORY);
-    if (savedHistory) historyList.innerHTML = savedHistory;
+
+    if (savedSecret && savedAttempts && savedStartTime && savedGameId) {
+        // RESTAURER la partie existante
+        currentGameId = savedGameId;
+        secret = savedSecret;
+        attempts = parseInt(savedAttempts) || 0;
+        startTime = parseInt(savedStartTime) || Date.now();
+        
+        console.log("🔄 Partie restaurée:", { 
+            secret: secret, 
+            attempts: attempts, 
+            gameId: currentGameId 
+        });
+    } else {
+        // NOUVELLE partie
+        currentGameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        secret = generateSecret();
+        attempts = 0;
+        startTime = Date.now();
+        
+        // Sauvegarder la nouvelle partie
+        localStorage.setItem(CONFIG.STORAGE.SECRET, secret);
+        localStorage.setItem(CONFIG.STORAGE.ATTEMPTS, attempts.toString());
+        localStorage.setItem(CONFIG.STORAGE.START_TIME, startTime.toString());
+        localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
+    }
+
+    // Restaurer l'historique
+    if (savedHistory) {
+        historyList.innerHTML = savedHistory;
+    }
 
     const savedLevel = localStorage.getItem(CONFIG.STORAGE.LEVEL);
     if (savedLevel && CONFIG.LEVELS.includes(parseInt(savedLevel))) {
@@ -705,7 +785,6 @@ window.addEventListener("load", () => {
         localStorage.setItem(CONFIG.STORAGE.LEVEL, CONFIG.DEFAULT_LEVEL);
     }
     
-    secret = generateSecret();
     updateDifficultyIndicator();
     initEventListeners();
 
@@ -735,3 +814,11 @@ window.addEventListener("load", () => {
 
     guessInput.focus();
 });
+
+// ==================== FONCTIONS EXPOSÉES ====================
+
+// Exposer les fonctions nécessaires pour les autres fichiers
+window.showLocalScoresOnly = showLocalScoresOnly;
+window.showOnlineScores = showOnlineScores;
+window.clearAllLocalScores = clearAllLocalScores;
+window.updateLocalDisplayWithNewScore = updateLocalDisplayWithNewScore;

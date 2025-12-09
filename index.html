@@ -45,6 +45,33 @@
 
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="icon-192.png" type="image/png">
+    
+    <!-- Dans la section <head> -->
+<script>
+    // Configuration du token GitHub
+    const GITHUB_TOKEN = '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'; // VOTRE TOKEN
+    
+    // Initialisation au chargement
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🎮 Vache Taureau - Version 3.0.0 (GitHub R/W)');
+        
+        // Définir le token GitHub
+        if (window.setGitHubToken && GITHUB_TOKEN) {
+            window.setGitHubToken(GITHUB_TOKEN);
+        }
+        
+        // Vérifier la connexion GitHub
+        setTimeout(() => {
+            if (window.checkGitHubConnection) {
+                window.checkGitHubConnection().then(connected => {
+                    if (connected) {
+                        console.log('✅ Système GitHub prêt');
+                    }
+                });
+            }
+        }, 2000);
+    });
+</script>
 </head>
 
 <body>
@@ -82,7 +109,7 @@
                 <button class="btn btn-primary" onclick="hideRules()">Fermer</button>
             </div>
 
-            <p class="signature">by zdig1<br>bit.ly/vache-taureau<br>v 3.0.0</p>
+            <p class="signature">v2.0.0 by zdig1<br>bit.ly/va-tau</p>
         </div>
     </div>
 
