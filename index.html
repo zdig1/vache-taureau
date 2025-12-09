@@ -46,30 +46,68 @@
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="icon-192.png" type="image/png">
     
-    <!-- Dans la section <head> -->
 <script>
-    // Configuration du token GitHub
-    const GITHUB_TOKEN = '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'; // VOTRE TOKEN
-    
+    // Configuration sécurisée du token GitHub
+    function initGitHubToken() {
+        // Essayer de récupérer le token depuis localStorage
+        let token = localStorage.getItem('github_token');
+        
+        // Si pas de token, demander à l'utilisateur
+        if (!token) {
+            token = prompt(
+                '🔑 Token GitHub requis\n\n' +
+                'Pour synchroniser les scores, vous avez besoin d\'un token GitHub.\n\n' +
+                '1. Allez sur: https://github.com/settings/tokens\n' +
+                '2. Créez un nouveau token (classic)\n' +
+                '3. Cochez "repo" pour les permissions\n' +
+                '4. Collez le token ici:'
+            );
+            
+            if (token) {
+                // Sauvegarder dans localStorage
+                localStorage.setItem('github_token', token);
+                console.log('✅ Token GitHub sauvegardé localement');
+            } else {
+                console.log('❌ Token GitHub non fourni');
+                showMessage("❌ Token GitHub manquant pour la synchronisation", "message-error");
+                return false;
+            }
+        }
+        
+        // Définir le token
+        if (window.setGitHubToken) {
+            window.setGitHubToken(token);
+            console.log('✅ Token GitHub initialisé');
+            return true;
+        }
+        
+        return false;
+    }
+
     // Initialisation au chargement
     document.addEventListener('DOMContentLoaded', function() {
         console.log('🎮 Vache Taureau - Version 3.0.0 (GitHub R/W)');
         
-        // Définir le token GitHub
-        if (window.setGitHubToken && GITHUB_TOKEN) {
-            window.setGitHubToken(GITHUB_TOKEN);
-        }
-        
-        // Vérifier la connexion GitHub
+        // Initialiser le token GitHub
         setTimeout(() => {
-            if (window.checkGitHubConnection) {
-                window.checkGitHubConnection().then(connected => {
-                    if (connected) {
-                        console.log('✅ Système GitHub prêt');
+            if (initGitHubToken()) {
+                console.log('🔑 Token GitHub configuré');
+                
+                // Vérifier la connexion GitHub
+                setTimeout(() => {
+                    if (window.checkGitHubConnection) {
+                        window.checkGitHubConnection().then(connected => {
+                            if (connected) {
+                                console.log('✅ Système GitHub prêt');
+                                showMessage("✅ Connecté à GitHub", "message-success");
+                            } else {
+                                console.log('⚠️ GitHub non connecté');
+                            }
+                        });
                     }
-                });
+                }, 2000);
             }
-        }, 2000);
+        }, 1000);
     });
 </script>
 </head>
