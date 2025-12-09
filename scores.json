@@ -1,7 +1,19 @@
 {
-    "scores": [],
-    "lastUpdate": "2024-01-01T00:00:00.000Z",
-    "totalGames": 0,
-    "version": "2.1",
-    "description": "Scores du jeu Vache Taureau - Système hybride local/GitHub"
+  "scores": [
+    {
+      "level": 3,
+      "attempts": 9,
+      "time": "2m 6s",
+      "date": "30/11/2025",
+      "timestamp": 1764519464569,
+      "pseudo": "GénialAs560",
+      "playerId": "player_1763548979417_ouly3dbg2",
+      "gameId": "game_1764519338098_1lzza4rs4",
+      "syncedAt": "2025-12-09T03:57:18.944Z"
+    }
+  ],
+  "lastUpdate": "2025-12-09T03:57:18.944Z",
+  "totalGames": 1,
+  "version": "2.1",
+  "description": "Scores du jeu Vache Taureau - SystÃ¨me hybride local/GitHub"
 }
