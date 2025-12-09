@@ -181,17 +181,27 @@ function checkGuess() {
     historyList.prepend(historyItem);
     localStorage.setItem(CONFIG.STORAGE.HISTORY, historyList.innerHTML);
 
-    // VICTOIRE
+    // VICTOIRE - Logique corrigée
     if (taureaux === level) {
         const timeSec = Math.floor((Date.now() - startTime) / 1000);
         const minutes = Math.floor(timeSec / 60);
         const seconds = timeSec % 60;
         const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
         
-        // Vérifier que cette partie n'a pas déjà été sauvegardée
-        if (!isGameAlreadySaved()) {
-            saveGameScore(secret.length, attempts, timeDisplay);
-            markGameAsSaved();
+        console.log("🎯 Victoire détectée!", {
+            secret: secret,
+            attempts: attempts,
+            time: timeDisplay,
+            gameId: currentGameId
+        });
+        
+        // Sauvegarder le score (appel simple et direct)
+        const saved = saveGameScore(secret.length, attempts, timeDisplay);
+        
+        if (saved) {
+            console.log("✅ Score sauvegardé avec succès");
+            // Marquer que cette partie a été sauvegardée
+            localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
         }
         
         showWinModal(attempts, timeDisplay);
@@ -199,24 +209,6 @@ function checkGuess() {
 
     guessInput.value = "";
     guessInput.focus();
-}
-
-function isGameAlreadySaved() {
-    const savedGameId = localStorage.getItem(CONFIG.STORAGE.CURRENT_GAME_ID);
-    return savedGameId === currentGameId;
-}
-
-function markGameAsSaved() {
-    localStorage.setItem(CONFIG.STORAGE.CURRENT_GAME_ID, currentGameId);
-}
-
-function clearGameState() {
-    // À utiliser quand une partie est terminée ou réinitialisée
-    localStorage.removeItem(CONFIG.STORAGE.SECRET);
-    localStorage.removeItem(CONFIG.STORAGE.ATTEMPTS);
-    localStorage.removeItem(CONFIG.STORAGE.START_TIME);
-    localStorage.removeItem(CONFIG.STORAGE.HISTORY);
-    // Ne pas supprimer CURRENT_GAME_ID pour éviter les resauvegardes
 }
 
 function showMessage(text, type = "") {
@@ -284,11 +276,21 @@ function resetGame() {
     
     hideWinModal();
     guessInput.focus();
+    
+    console.log("🔄 Nouvelle partie:", { secret: secret, gameId: currentGameId });
 }
 
 function replayGame() {
     resetGame();
     hideWinModal();
+}
+
+function clearGameState() {
+    localStorage.removeItem(CONFIG.STORAGE.SECRET);
+    localStorage.removeItem(CONFIG.STORAGE.ATTEMPTS);
+    localStorage.removeItem(CONFIG.STORAGE.START_TIME);
+    localStorage.removeItem(CONFIG.STORAGE.HISTORY);
+    // Note: On ne supprime pas CURRENT_GAME_ID ici
 }
 
 function changeGameLevel() {
@@ -330,14 +332,17 @@ function applyLevelChange(level) {
     localStorage.setItem(CONFIG.STORAGE.LEVEL, level.toString());
     
     updateDifficultyIndicator();
+    
+    console.log("📏 Changement de niveau:", { level: level, gameId: currentGameId });
 }
 
-// ==================== SCORES LOCAUX ====================
+// ==================== SCORES LOCAUX (VERSION SIMPLIFIÉE) ====================
 
 function saveGameScore(level, attempts, time, date = null) {
     const player = getCurrentPlayer();
     if (!player) {
         console.log("❌ Impossible de sauvegarder : joueur non identifié");
+        showMessage("Définis un pseudo pour sauvegarder ton score!", "message-error");
         return false;
     }
 
@@ -345,83 +350,68 @@ function saveGameScore(level, attempts, time, date = null) {
         level: level,
         attempts: attempts,
         time: time,
-        date: date || new Date().toLocaleDateString("fr-FR"),
+        date: date || new Date().toLocaleDateString("fr-FR", {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }),
         timestamp: Date.now(),
         pseudo: player.pseudo,
-        playerName: player.pseudo,
         playerId: player.playerId,
         gameId: currentGameId
     };
 
     console.log("💾 Sauvegarde du score:", newScore);
 
-    // 1. Sauvegarde locale
-    saveScoreLocal(newScore);
+    // Sauvegarde locale (méthode simplifiée et fiable)
+    const saved = saveScoreLocalSimple(newScore);
     
-    // 2. NETTOYER l'état du jeu (puisque la partie est terminée)
-    clearGameState();
-    
-    // 3. Synchronisation GitHub
-    if (typeof saveScoreOnline === 'function') {
-        console.log("🚀 Tentative d'envoi vers GitHub...");
-        saveScoreOnline(newScore)
-            .then(success => {
-                if (success) {
-                    console.log("✅ Score envoyé à GitHub !");
-                    showMessage("Score synchronisé en ligne ! 🌐");
-                    
-                    // Recharger l'affichage des scores
-                    if (typeof displayOnlineScores === 'function') {
-                        setTimeout(() => displayOnlineScores(), 1000);
-                    }
-                } else {
-                    console.log("📱 Score sauvegardé localement, en attente de sync");
-                    showMessage("Score sauvegardé localement 📱");
-                }
-            })
-            .catch(error => {
-                console.log('❌ Erreur GitHub:', error.message);
-                showMessage("Score sauvegardé localement 📱");
-            });
+    if (saved) {
+        showMessage(`Score sauvegardé: ${attempts} essais en ${time} 🏆`);
+        return true;
     } else {
-        console.log("❌ Fonction saveScoreOnline non disponible");
-        showMessage("Score sauvegardé localement 📱");
+        showMessage("Erreur lors de la sauvegarde du score", "message-error");
+        return false;
     }
-
-    return true;
 }
 
-function saveScoreLocal(newScore) {
-    const scores = getLocalScores();
-    
-    // Vérifier les doublons avec l'identifiant de partie
-    const isDuplicate = scores.some(score => 
-        score.gameId === newScore.gameId || // Même partie
-        (score.playerId === newScore.playerId &&
-         score.attempts === newScore.attempts &&
-         score.level === newScore.level &&
-         Math.abs(new Date(score.timestamp) - new Date(newScore.timestamp)) < 5000) // 5 secondes
-    );
-    
-    if (isDuplicate) {
-        console.log("🚫 Score dupliqué ignoré:", newScore);
-        return;
+function saveScoreLocalSimple(newScore) {
+    try {
+        // Récupérer tous les scores existants
+        let scores = JSON.parse(localStorage.getItem(CONFIG.STORAGE.SCORES) || '[]');
+        
+        // Vérifier si ce score (même gameId) existe déjà
+        const existingIndex = scores.findIndex(score => score.gameId === newScore.gameId);
+        
+        if (existingIndex !== -1) {
+            console.log("🔄 Mise à jour du score existant");
+            scores[existingIndex] = newScore;
+        } else {
+            console.log("➕ Ajout d'un nouveau score");
+            scores.push(newScore);
+        }
+        
+        // Trier par: niveau → tentatives → date
+        scores.sort((a, b) => {
+            if (a.level !== b.level) return a.level - b.level;
+            if (a.attempts !== b.attempts) return a.attempts - b.attempts;
+            return b.timestamp - a.timestamp;
+        });
+        
+        // Limiter à 30 scores maximum (10 par niveau)
+        if (scores.length > 30) {
+            scores = scores.slice(0, 30);
+        }
+        
+        // Sauvegarder dans localStorage
+        localStorage.setItem(CONFIG.STORAGE.SCORES, JSON.stringify(scores));
+        
+        console.log(`✅ Score sauvegardé. Total: ${scores.length} scores`);
+        return true;
+    } catch (error) {
+        console.error("❌ Erreur sauvegarde score:", error);
+        return false;
     }
-    
-    scores.push(newScore);
-
-    // Garder top 10 par niveau
-    const bestScores = [];
-    [3, 4, 5].forEach(level => {
-        const levelScores = scores
-            .filter(score => score.level === level)
-            .sort((a, b) => a.attempts - b.attempts)
-            .slice(0, 10);
-        bestScores.push(...levelScores);
-    });
-
-    localStorage.setItem(CONFIG.STORAGE.SCORES, JSON.stringify(bestScores));
-    console.log("💾 Score sauvegardé localement:", newScore);
 }
 
 function getLocalScores() {
@@ -437,6 +427,11 @@ function clearAllLocalScores() {
         localStorage.removeItem(CONFIG.STORAGE.SCORES);
         showMessage("🗑️ Tous les scores locaux ont été supprimés !");
         console.log("🧹 Tous les scores locaux effacés");
+        
+        // Recharger l'affichage des scores si la modal est ouverte
+        if (document.getElementById("scoresModal").style.display === "block") {
+            displayLocalScores();
+        }
     }
 }
 
@@ -447,36 +442,16 @@ function displayLocalScores() {
 
     if (!scores || scores.length === 0) {
         container.innerHTML = `
-    <div style="text-align: center; color: #666; padding: 20px;">
-        <div style="font-size: 48px; margin-bottom: 10px;">📊</div>
-        <div>Aucun score enregistré</div>
-        <div style="font-size: 12px; margin-top: 8px;">Soyez le premier à jouer !</div>
-    </div>
-`;
+            <div style="text-align: center; color: #666; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">📊</div>
+                <div>Aucun score enregistré</div>
+                <div style="font-size: 12px; margin-top: 8px;">Jouez et gagnez pour apparaître ici !</div>
+            </div>
+        `;
         return;
     }
 
     displayScoresInContainer(scores, container);
-}
-
-function cleanDuplicateScores() {
-    const scores = getLocalScores();
-    const uniqueScores = [];
-    const seen = new Set();
-    
-    scores.forEach(score => {
-        // Clé unique basée sur joueur + tentatives + niveau + timestamp
-        const key = `${score.playerId}_${score.attempts}_${score.level}_${Math.round(score.timestamp / 1000)}`;
-        
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueScores.push(score);
-        }
-    });
-    
-    localStorage.setItem(CONFIG.STORAGE.SCORES, JSON.stringify(uniqueScores));
-    console.log(`🧹 Nettoyage: ${scores.length - uniqueScores.length} doublons supprimés`);
-    return uniqueScores;
 }
 
 function calculateLocalStats() {
@@ -519,7 +494,7 @@ function displayScoresInContainer(scores, container) {
         5: "#F44336"  // Rouge
     };
 
-    let html = '<div style="text-align: center; font-weight: bold; margin-bottom: 20px; font-size: 18px; background: #ffd700; padding: 10px; border-radius: 8px;">Top 10</div>';
+    let html = '<div style="text-align: center; font-weight: bold; margin-bottom: 20px; font-size: 18px; background: #ffd700; padding: 10px; border-radius: 8px;">Top 10 par niveau</div>';
 
     Object.keys(scoresByLevel)
         .sort((a, b) => parseInt(a) - parseInt(b))
@@ -547,28 +522,28 @@ function displayScoresInContainer(scores, container) {
                 else positionDisplay = `${position}.`;
 
                 html += `
-    <div style="padding: 12px; background: #fff9c4; margin: 8px 0; border-radius: 10px; border: 2px solid ${levelColor}; ${isCurrentPlayer ? 'background: #fff176; border-width: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}">
-        <!-- Ligne 1 -->
-        <div style="margin-bottom: 5px;">
-            <span style="font-weight: bold; font-size: 16px; color: ${levelColor}; margin-right: 8px;">${positionDisplay}</span>
-            <span style="font-size: 15px; font-weight: ${isCurrentPlayer ? 'bold' : 'normal'}; color: #000;">
-                ${score.pseudo || 'Anonyme'}
-                ${isCurrentPlayer ? '<span style="font-size: 11px; color: ' + levelColor + '; margin-left: 5px;">(vous)</span>' : ''}
-            </span>
-        </div>
-        
-        <!-- Ligne 2 -->
-        <div style="margin-bottom: 3px; font-size: 14px;">
-            <span style="font-weight: bold; color: #d32f2f;">${score.attempts} essai${score.attempts > 1 ? 's' : ''}</span>
-            <span style="color: #666; margin-left: 8px;">en ${score.time}</span>
-        </div>
-        
-        <!-- Ligne 3 -->
-        <div style="font-size: 12px; color: #888; text-align: right;">
-            ${score.date}
-        </div>
-    </div>
-`;
+                    <div style="padding: 12px; background: #fff9c4; margin: 8px 0; border-radius: 10px; border: 2px solid ${levelColor}; ${isCurrentPlayer ? 'background: #fff176; border-width: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);' : ''}">
+                        <!-- Ligne 1 -->
+                        <div style="margin-bottom: 5px;">
+                            <span style="font-weight: bold; font-size: 16px; color: ${levelColor}; margin-right: 8px;">${positionDisplay}</span>
+                            <span style="font-size: 15px; font-weight: ${isCurrentPlayer ? 'bold' : 'normal'}; color: #000;">
+                                ${score.pseudo || 'Anonyme'}
+                                ${isCurrentPlayer ? '<span style="font-size: 11px; color: ' + levelColor + '; margin-left: 5px;">(vous)</span>' : ''}
+                            </span>
+                        </div>
+                        
+                        <!-- Ligne 2 -->
+                        <div style="margin-bottom: 3px; font-size: 14px;">
+                            <span style="font-weight: bold; color: #d32f2f;">${score.attempts} essai${score.attempts > 1 ? 's' : ''}</span>
+                            <span style="color: #666; margin-left: 8px;">en ${score.time}</span>
+                        </div>
+                        
+                        <!-- Ligne 3 -->
+                        <div style="font-size: 12px; color: #888; text-align: right;">
+                            ${score.date}
+                        </div>
+                    </div>
+                `;
             });
             
             html += "</div>";
@@ -576,32 +551,6 @@ function displayScoresInContainer(scores, container) {
     
     container.innerHTML = html;
 }
-
-
-
-
-
-
-// Ajoutez cette fonction après les autres fonctions de score
-function updateLocalDisplayWithNewScore(score) {
-    // Cette fonction est appelée par score.js pour mettre à jour l'affichage
-    console.log('📊 Mise à jour affichage avec nouveau score:', score);
-    
-    // Si le modal des scores est ouvert, recharger l'affichage
-    const scoresModal = document.getElementById("scoresModal");
-    if (scoresModal && scoresModal.style.display === "block") {
-        const currentView = localStorage.getItem('currentScoresView') || 'local';
-        if (currentView === 'local') {
-            displayLocalScores();
-        } else if (currentView === 'online') {
-            if (typeof displayOnlineScores === 'function') {
-                displayOnlineScores();
-            }
-        }
-    }
-}
-
-
 
 // ==================== INTERFACE ====================
 
@@ -634,19 +583,19 @@ function showStats() {
             <div style="text-align: center; color: #666; padding: 40px;">
                 <div style="font-size: 48px; margin-bottom: 10px;">📊</div>
                 <div>Aucune donnée statistique</div>
-                <div style="font-size: 12px; margin-top: 8px;">Jouez pour générer des statistiques !</div>
+                <div style="font-size: 12px; margin-top: 8px;">Jouez et gagnez pour générer des statistiques !</div>
             </div>
         `;
     } else {
         container.innerHTML = `
             <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; margin-bottom: 10px; color: #000; background: #ffd700; padding: 5px; border-radius: 5px; text-align: center;">📈 Global</div>
+                <div style="font-weight: bold; margin-bottom: 10px; color: #000; background: #ffd700; padding: 5px; border-radius: 5px; text-align: center;">📈 Statistiques Globales</div>
                 <div style="display: flex; justify-content: space-between; padding: 8px;"><span>Parties jouées:</span><strong>${stats.totalGames}</strong></div>
                 <div style="display: flex; justify-content: space-between; padding: 8px;"><span>Meilleur score:</span><strong>${stats.bestScore} essais</strong></div>
             </div>
             ${Object.keys(stats.byLevel).map(level => `
                 <div style="margin-bottom: 15px;">
-                    <div style="font-weight: bold; margin-bottom: 5px; color: #000;">${level} chiffres</div>
+                    <div style="font-weight: bold; margin-bottom: 5px; color: #000; background: #f5f5f5; padding: 5px; border-radius: 5px;">Niveau ${level} chiffres</div>
                     <div style="display: flex; justify-content: space-between; padding: 4px;"><span>Parties:</span><strong>${stats.byLevel[level].count}</strong></div>
                     <div style="display: flex; justify-content: space-between; padding: 4px;"><span>Meilleur:</span><strong>${stats.byLevel[level].best} essais</strong></div>
                 </div>
@@ -658,32 +607,7 @@ function showStats() {
 
 function showScores() {
     document.getElementById("scoresModal").style.display = "block";
-    
-    // Demander à l'utilisateur ce qu'il veut voir
-    const container = document.getElementById("highscoresList");
-    container.innerHTML = `
-        <div style="text-align: center; padding: 20px;">
-            <div style="margin-bottom: 15px; font-weight: bold;">Que voulez-vous voir ?</div>
-            <button onclick="showLocalScoresOnly()" class="btn btn-primary" style="margin: 5px;">
-                📱 Mes scores locaux
-            </button>
-            <button onclick="showOnlineScores()" class="btn btn-primary" style="margin: 5px;">
-                🌐 Scores en ligne
-            </button>
-        </div>
-    `;
-}
-
-function showLocalScoresOnly() {
     displayLocalScores();
-}
-
-function showOnlineScores() {
-    if (typeof displayOnlineScores === 'function') {
-        displayOnlineScores();
-    } else {
-        displayLocalScores();
-    }
 }
 
 function hideStats() {
@@ -708,10 +632,6 @@ function initEventListeners() {
     guessInput.addEventListener("input", (e) => {
         const level = parseInt(gameLevelSelect.value || CONFIG.DEFAULT_LEVEL);
         e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, level);
-    });
-
-    window.addEventListener("click", (e) => {
-        if (e.target.matches('.modal')) e.target.style.display = "none";
     });
 
     // Navigation modals
@@ -803,8 +723,12 @@ window.addEventListener("load", () => {
 
     // Nettoyer les doublons existants au chargement
     setTimeout(() => {
-        cleanDuplicateScores();
-    }, 1000);
+        const scores = getLocalScores();
+        console.log("📊 Scores au chargement:", scores.length);
+        if (scores.length > 0) {
+            console.log("Dernier score:", scores[scores.length - 1]);
+        }
+    }, 500);
 
     gameLevelSelect.addEventListener("change", function() {
         localStorage.setItem(CONFIG.STORAGE.LEVEL, this.value);
@@ -817,8 +741,5 @@ window.addEventListener("load", () => {
 
 // ==================== FONCTIONS EXPOSÉES ====================
 
-// Exposer les fonctions nécessaires pour les autres fichiers
-window.showLocalScoresOnly = showLocalScoresOnly;
-window.showOnlineScores = showOnlineScores;
+// Exposer les fonctions nécessaires
 window.clearAllLocalScores = clearAllLocalScores;
-window.updateLocalDisplayWithNewScore = updateLocalDisplayWithNewScore;

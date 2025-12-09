@@ -45,71 +45,6 @@
 
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="icon-192.png" type="image/png">
-    
-<script>
-    // Configuration sécurisée du token GitHub
-    function initGitHubToken() {
-        // Essayer de récupérer le token depuis localStorage
-        let token = localStorage.getItem('github_token');
-        
-        // Si pas de token, demander à l'utilisateur
-        if (!token) {
-            token = prompt(
-                '🔑 Token GitHub requis\n\n' +
-                'Pour synchroniser les scores, vous avez besoin d\'un token GitHub.\n\n' +
-                '1. Allez sur: https://github.com/settings/tokens\n' +
-                '2. Créez un nouveau token (classic)\n' +
-                '3. Cochez "repo" pour les permissions\n' +
-                '4. Collez le token ici:'
-            );
-            
-            if (token) {
-                // Sauvegarder dans localStorage
-                localStorage.setItem('github_token', token);
-                console.log('✅ Token GitHub sauvegardé localement');
-            } else {
-                console.log('❌ Token GitHub non fourni');
-                showMessage("❌ Token GitHub manquant pour la synchronisation", "message-error");
-                return false;
-            }
-        }
-        
-        // Définir le token
-        if (window.setGitHubToken) {
-            window.setGitHubToken(token);
-            console.log('✅ Token GitHub initialisé');
-            return true;
-        }
-        
-        return false;
-    }
-
-    // Initialisation au chargement
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🎮 Vache Taureau - Version 3.0.0 (GitHub R/W)');
-        
-        // Initialiser le token GitHub
-        setTimeout(() => {
-            if (initGitHubToken()) {
-                console.log('🔑 Token GitHub configuré');
-                
-                // Vérifier la connexion GitHub
-                setTimeout(() => {
-                    if (window.checkGitHubConnection) {
-                        window.checkGitHubConnection().then(connected => {
-                            if (connected) {
-                                console.log('✅ Système GitHub prêt');
-                                showMessage("✅ Connecté à GitHub", "message-success");
-                            } else {
-                                console.log('⚠️ GitHub non connecté');
-                            }
-                        });
-                    }
-                }, 2000);
-            }
-        }, 1000);
-    });
-</script>
 </head>
 
 <body>
@@ -156,7 +91,7 @@
         <div class="modal-content">
             <h2 class="modal-title">⚙️ Options</h2>
 
-            <!-- Section Pseudo - Réorganisée -->
+            <!-- Section Pseudo -->
             <div class="pseudo-section" onclick="changePseudo()">
                 <div class="pseudo-display">
                     <div class="pseudo-info">
@@ -169,7 +104,7 @@
                 </div>
             </div>
 
-            <!-- Section Niveau - Alignée à droite -->
+            <!-- Section Niveau -->
             <div class="level-section">
                 <div class="level-label">Niveau</div>
                 <select id="gameLevel" class="level-select">
@@ -186,16 +121,6 @@
 
             <div class="scores-link" onclick="hideOptions(); showScores();">
                 <strong>📈 Tous les scores</strong>
-            </div>
-
-            <!-- Bouton État GitHub -->
-            <div class="stats-link" onclick="hideOptions(); showGitHubStatus();" style="background: #333; color: white;">
-                <strong>🔧 État GitHub</strong>
-            </div>
-
-            <!-- Synchronisation manuelle -->
-            <div class="stats-link" onclick="hideOptions(); manualSync();" style="background: #4CAF50; color: white;">
-                <strong>🔄 Sync maintenant</strong>
             </div>
 
             <!-- Effacer scores locaux -->
@@ -256,21 +181,6 @@
             <h2 class="modal-title">🏆 Tableau des Scores</h2>
             <div id="highscoresList" class="scores-container"></div>
 
-            <!-- Options d'affichage -->
-            <div style="display: flex; gap: 10px; justify-content: center; margin: 15px 0;">
-                <button onclick="showLocalScoresOnly()" class="btn" style="background: #FF9800; color: white;">
-                    📱 Scores locaux
-                </button>
-                <button onclick="showOnlineScores()" class="btn" style="background: #2196F3; color: white;">
-                    🌐 Scores GitHub
-                </button>
-            </div>
-
-            <!-- Bouton synchronisation -->
-            <div class="stats-link" onclick="manualSync()" style="background: #4CAF50; color: white; margin: 10px 0;">
-                <strong>🔄 Synchroniser avec GitHub</strong>
-            </div>
-
             <div class="action-group">
                 <button class="btn btn-main" onclick="hideScores(); showStats();">Mes statistiques</button>
                 <button class="btn btn-primary" onclick="hideScores()">Fermer</button>
@@ -290,23 +200,7 @@
         </div>
     </div>
 
-    <!-- Modal État GitHub -->
-    <div id="githubStatusModal" class="modal">
-        <div class="modal-content">
-            <h2 class="modal-title">🔧 État GitHub</h2>
-            <div id="githubStatusContent" class="scores-container">
-                Chargement des informations GitHub...
-            </div>
-
-            <div class="action-group">
-                <button class="btn btn-main" onclick="manualSync()">🔄 Synchroniser maintenant</button>
-                <button class="btn btn-primary" onclick="hideGitHubStatus()">Fermer</button>
-            </div>
-        </div>
-    </div>
-
     <script src="game.js"></script>
-    <script src="score.js"></script>
 
     <script>
         // PWA avec gestion d'erreurs
@@ -332,50 +226,9 @@
             }
         });
 
-        // Fonctions pour les nouveaux modals
-        function showGitHubStatus() {
-            const modal = document.getElementById("githubStatusModal");
-            const content = document.getElementById("githubStatusContent");
-            
-            // Récupérer l'état actuel
-            const pending = window.getPendingScores ? window.getPendingScores() : [];
-            const cached = window.getCachedScores ? window.getCachedScores() : [];
-            
-            let statusHTML = `
-                <div style="padding: 15px;">
-                    <div style="margin-bottom: 15px;">
-                        <div><strong>Connexion GitHub:</strong> ${window.githubAvailable ? '✅ Connecté' : '❌ Hors ligne'}</div>
-                        <div><strong>Scores en cache:</strong> ${cached.length}</div>
-                        <div><strong>Scores en attente:</strong> ${pending.length}</div>
-                        <div><strong>Dernière synchro:</strong> ${new Date().toLocaleTimeString()}</div>
-                    </div>
-            `;
-            
-            if (pending.length > 0) {
-                statusHTML += `
-                    <div style="background: #fff9c4; padding: 10px; border-radius: 8px; margin-top: 10px;">
-                        <strong>Scores en attente de synchronisation:</strong>
-                        ${pending.map((score, index) => `
-                            <div style="margin-top: 5px; padding: 5px; background: white; border-radius: 5px;">
-                                ${index + 1}. ${score.playerName || 'Anonyme'} - ${score.attempts} coups (Niv. ${score.level})
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-            
-            statusHTML += `</div>`;
-            content.innerHTML = statusHTML;
-            modal.style.display = "block";
-        }
-
-        function hideGitHubStatus() {
-            document.getElementById("githubStatusModal").style.display = "none";
-        }
-
         // Gestion des clics en dehors des modals
         window.addEventListener('click', function(event) {
-            const modals = ['rulesModal', 'optionsModal', 'pseudoModal', 'statsModal', 'scoresModal', 'winModal', 'githubStatusModal'];
+            const modals = ['rulesModal', 'optionsModal', 'pseudoModal', 'statsModal', 'scoresModal', 'winModal'];
             modals.forEach(modalId => {
                 const modal = document.getElementById(modalId);
                 if (modal && event.target === modal) {
@@ -386,18 +239,7 @@
 
         // Initialisation au chargement
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🎮 Vache Taureau - Version 3.0.0 (GitHub R/W)');
-            
-            // Vérifier la connexion GitHub
-            setTimeout(() => {
-                if (window.checkGitHubConnection) {
-                    window.checkGitHubConnection().then(connected => {
-                        if (connected) {
-                            console.log('✅ Système GitHub prêt');
-                        }
-                    });
-                }
-            }, 2000);
+            console.log('🎮 Vache Taureau - Version 2.0.0 (Scores locaux)');
         });
     </script>
 </body>
