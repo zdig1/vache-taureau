@@ -5,6 +5,7 @@ const staticAssets = [
     '/',
     '/index.html',
     '/style.css',
+    
     '/game.js',
     '/score.js',
     '/icon-192.png',
