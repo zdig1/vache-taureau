@@ -1,40 +1,25 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" dir="ltr">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <!-- SECTION 1 : META DE BASE                    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vache Taureau</title>
 
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#ffd700">
     <meta name="description" content="Jeu de réflexion - Devinez le nombre secret avec des vaches et taureaux">
-
-    <!-- Pré-chargement des assets critiques -->
-    <link rel="preload" href="icon-192.png" as="image">
-    <link rel="preload" href="style.css" as="style">
-    <link rel="preload" href="game.js" as="script">
-
-    <!-- iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Vache Taureau">
-    <link rel="apple-touch-icon" href="./media/icon-192.png">
+    <meta name="author" content="zdig1">
+    <meta name="keywords" content="jeu, vache, taureau, mastermind, logique, devinette">
 
     <!-- Windows -->
     <meta name="msapplication-TileColor" content="#ffd700">
     <meta name="msapplication-TileImage" content="./media/icon-192.png">
 
-    <!-- SEO -->
-    <meta name="keywords" content="jeu, vache, taureau, mastermind, logique, devinette">
-    <meta name="author" content="zdig1">
-
     <!-- Open Graph (partage réseaux sociaux) -->
+    <meta property="og:type" content="website">
     <meta property="og:title" content="Vache Taureau - Jeu de logique">
     <meta property="og:description" content="Devinez le nombre secret ! Un jeu de réflexion addictif">
     <meta property="og:image" content="./media/icon-512.png">
-    <meta property="og:type" content="website">
     <meta property="og:url" content="https://zdig1.github.io/vache-taureau/">
 
     <!-- Twitter Card -->
@@ -43,8 +28,22 @@
     <meta name="twitter:description" content="Jeu de logique - Devinez le nombre secret">
     <meta name="twitter:image" content="./media/icon-512.png">
 
-    <link rel="stylesheet" href="./media/style.css">
-    <link rel="icon" href="./media/icon-192.png" type="image/png">
+    <!-- SECTION 4 : PWA (ICÔNES ET MANIFEST)        -->
+    <link rel="icon" href="./media/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="./media/icon-192.png" />
+    <link rel="apple-touch-startup-image" href="./media/icon-512.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <!-- Couleurs et comportement PWA -->
+    <meta name="theme-color" content="#ffd700" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Maladies rares en pédiatrie" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- SECTION 5 : CSS                              -->
+    <link rel="stylesheet" href="./style.css" />
+
 </head>
 
 <body>
@@ -124,7 +123,8 @@
             </div>
 
             <!-- Effacer scores locaux -->
-            <div class="stats-link" onclick="hideOptions(); clearAllLocalScores();" style="background: #ff4444; color: white;">
+            <div class="stats-link" onclick="hideOptions(); clearAllLocalScores();"
+                style="background: #ff4444; color: white;">
                 <strong>🗑️ Effacer scores locaux</strong>
             </div>
 
@@ -200,12 +200,22 @@
         </div>
     </div>
 
+  <!-- noscript fallback -->
+  <noscript>
+    <div
+      style="text-align:center; padding:2rem; font-family:Arial,sans-serif; background:#fff; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999;">
+      <h2 style="color:#FF9800;">⚠️ JavaScript requis</h2>
+      <p>Veuillez activer JavaScript dans votre navigateur.</p>
+    </div>
+  </noscript>
+
+    <!-- Scripts principaux -->
     <script src="game.js"></script>
 
     <script>
         // PWA avec gestion d'erreurs
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
+            navigator.serviceWorker.register('./sw.js')
                 .then(registration => {
                     console.log('✅ PWA enregistrée');
                 })
@@ -213,13 +223,13 @@
                     console.log('❌ Erreur Service Worker:', error);
                 });
         }
-        
+
         // Correction iOS - Empêcher le zoom sur l'input
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const guessInput = document.getElementById('guessInput');
             if (guessInput) {
-                guessInput.addEventListener('focus', function() {
-                    setTimeout(function() {
+                guessInput.addEventListener('focus', function () {
+                    setTimeout(function () {
                         document.body.style.zoom = "1";
                     }, 100);
                 });
@@ -227,7 +237,7 @@
         });
 
         // Gestion des clics en dehors des modals
-        window.addEventListener('click', function(event) {
+        window.addEventListener('click', function (event) {
             const modals = ['rulesModal', 'optionsModal', 'pseudoModal', 'statsModal', 'scoresModal', 'winModal'];
             modals.forEach(modalId => {
                 const modal = document.getElementById(modalId);
@@ -238,10 +248,11 @@
         });
 
         // Initialisation au chargement
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             console.log('🎮 Vache Taureau - Version 2.0.0 (Scores locaux)');
         });
     </script>
+
 </body>
 
 </html>

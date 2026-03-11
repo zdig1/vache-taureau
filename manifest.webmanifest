@@ -6,30 +6,33 @@
   "version": "1.0.0",
   "lang": "fr-FR",
   "dir": "ltr",
-  "start_url": "./index.html",
+  "start_url": "./index.html?utm_source=pwa",
   "scope": "./",
   "display": "standalone",
   "display_override": [
+    "window-controls-overlay",
+    "fullscreen",
     "standalone",
-    "minimal-ui"
+    "minimal-ui",
+    "browser"
   ],
   "orientation": "portrait-primary",
   "background_color": "#ffd700",
   "theme_color": "#ffd700",
   "categories": [
-    "education",
+    "games",
     "entertainment",
-    "games"
+    "education"
   ],
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./media/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "./media/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -41,5 +44,13 @@
       "type": "image/png",
       "sizes": "720x1520"
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "iarc_rating_id": "everyone",
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  }
 }
